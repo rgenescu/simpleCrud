@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
 import java.util.List;
-import java.util.Map;
 
 @Controller
 public class RegistrationController {
@@ -28,7 +28,6 @@ public class RegistrationController {
         return "registration";
     }
 
-
     @PostMapping("/register")
     public ResponseEntity<String> registerUser(@Valid @RequestBody User user, BindingResult bindingResult) {
         if (bindingResult.hasErrors()) {
@@ -41,12 +40,22 @@ public class RegistrationController {
                         .append("; ");
             }
 
-            return ResponseEntity.badRequest().body(errorMessage.toString());
+            JSONObject errorResponse = new JSONObject();
+            errorResponse.put("error", true);
+            errorResponse.put("message", errorMessage.toString());
+
+            return ResponseEntity.badRequest().body(errorResponse.toString());
         }
 
         userService.createUser(user);
         String message = "User with email address " + user.getEmail() + " has been successfully registered.";
-        return ResponseEntity.status(HttpStatus.CREATED).body(message);
+
+        JSONObject successResponse = new JSONObject();
+        successResponse.put("error", false);
+        successResponse.put("message", message);
+        successResponse.put("userId", user.getId());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(successResponse.toString());
     }
 
     @GetMapping("/users")
@@ -56,13 +65,20 @@ public class RegistrationController {
     }
 
     @GetMapping("/users/user/{id}")
-    public ResponseEntity<User> getUserDetails(@PathVariable Long id) {
+    public ResponseEntity<String> getUserDetails(@PathVariable Long id) {
         User user = userService.getUserByID(id);
-
+        JSONObject response = new JSONObject();
         if (user != null) {
-            return ResponseEntity.ok(user);
+            response.put("userId", user.getId());
+            response.put("firstName", user.getFirstName());
+            response.put("lastName", user.getLastName());
+            response.put("email", user.getEmail());
+            response.put("mobile", user.getPhoneNumber());
+
+            return ResponseEntity.status(HttpStatus.OK).body(response.toString());
         } else {
-            return ResponseEntity.notFound().build();
+            response.put("error", "User with requested Id ws not found.");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response.toString());
         }
     }
 
@@ -72,6 +88,7 @@ public class RegistrationController {
             @RequestBody User updatedUser) {
 
         User existingUser = userService.getUserByID(id);
+        JSONObject response = new JSONObject();
         String message;
         if (existingUser != null) {
             if (updatedUser.getFirstName() != null) {
@@ -88,25 +105,34 @@ public class RegistrationController {
             }
 
             userService.updateUser(existingUser);
-
             message = "User with ID " + id + " has been successfully updated.";
-            return ResponseEntity.ok(message);
+            response.put("error", false);
+            response.put("userId", id);
+
         } else {
             message = "User with ID " + id + " was not found.";
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(message);
+            response.put("error", true);
         }
+        response.put("message", message);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response.toString());
     }
 
     @DeleteMapping("/users/user/{id}/delete")
     public ResponseEntity<String> deleteUser(@PathVariable Long id) {
         userService.deleteUser(id);
+        JSONObject response = new JSONObject();
         String message;
         if (id != null) {
             message = "User with ID " + id + " has been successfully deleted.";
-            return ResponseEntity.ok(message);
+            response.put("error", false);
+            response.put("message", message);
+
+            return ResponseEntity.status(HttpStatus.OK).body(response.toString());
         } else {
             message = "User with ID " + id + " was not found.";
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(message);
+            response.put("error", true);
+            response.put("message", message);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response.toString());
         }
     }
 }
